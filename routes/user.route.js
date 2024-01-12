@@ -2,6 +2,8 @@ var express = require("express")
 var router =  express.Router()
 var passport = require("../config/passport")
 var xulydb = require("../CRUD/xulydb")
+var moment = require('moment')
+const sendmail = require('../sendmail/sendmail')
 router.get("/", (req, res, next) => {
     res.render("index")
 })
@@ -14,6 +16,170 @@ router.get("/signin", (req, res , next) => {
         hasErrors: messages.length > 0
     })
 })
+//---------------------------------them -------------
+router.get('/cronjobsendmail', async (req, res) => {
+    var data = await xulydb.doc_createthietbi()
+    var newdata = await tinhngayconlai(data)
+    if (newdata) {
+        sendmail.sendmail(newdata)
+        res.status(200).send('ok');
+    } else {
+        res.status(200).send('ko gửi mail')
+    }
+
+
+})
+
+router.get('/viewcreatethietbi', async (req, res) => {
+    if (req.isAuthenticated()) {
+        var data = await xulydb.doc_createthietbi()
+        var newdata = await tinhngayconlai(data)
+        const daynow = moment().format('DD-MM-YYYY');
+        //console.log(newdata)
+        res.render("mainSbAdmin/createthietbiview", {
+            _username: req.user.username,
+            data: newdata,
+            activeuser: '',
+            activetb: '',
+            activetbdp2: 'active',
+            daynow: daynow
+        })
+    } else {
+        res.redirect("/signin")
+    }
+})
+
+async function tinhngayconlai(data) {
+    var newdata = []
+
+
+    for (let i = 0; i < data.length; i++) {
+        let daynow = moment().format('YYYY-MM-DD');
+        let songay = moment(data[i].ngayhethan).diff(daynow, 'days');
+        //console.log('Data số ngày: ',songay);
+        data[i].songayhethan = songay - 1;
+        newdata.push(data[i])
+    }
+
+    return newdata
+}
+
+router
+    .get('/createthietbi', (req, res) => {
+        if (req.isAuthenticated()) {
+            res.render('mainSbAdmin/createthietbi', {
+                _username: req.user.username,
+                data: 'data',
+                activeuser: 'active',
+                activetb: '',
+                activetbdp2: '',
+
+
+            })
+        } else {
+            res.redirect("/signin")
+        }
+    })
+
+    .post('/themcreatethietbi', (req, res) => {
+        if (req.isAuthenticated()) {
+            var nnhap = moment(req.body.ngaynhap)
+            var sothang = req.body.timehethan
+            const nhethan = nnhap.add(sothang, 'months')
+            var data = {
+                username: req.user.username,
+                tentb: req.body.tentb,
+                dvt: req.body.dvt,
+                soluong: req.body.soluong,
+                ngaynhap: req.body.ngaynhap,
+                timehethan: req.body.timehethan,
+                ngayhethan: nhethan.format('YYYY-MM-DD'),
+                tenncc: req.body.tenncc,
+                sdtncc: req.body.sdtncc,
+                tinhtrang: req.body.tinhtrang,
+                ghichu: req.body.ghichu,
+            }
+            try {
+                xulydb.them_createthietbi(data)
+                res.redirect('/createthietbi')
+            } catch {
+                e => {
+                    res.send(e)
+                }
+            }
+        } else {
+            res.redirect("/signin")
+        }
+    })
+
+router.post('/xoathietbi', async (req, res) => {
+    if (req.isAuthenticated()) {
+        let tentb = req.body.tentb
+        await xulydb.xoa_createthietbi(tentb)
+        res.end()
+    } else {
+        res.redirect("/signin")
+    }
+})
+
+router
+    .get('/suacreatethietbi', async (req, res) => {
+        let tentb = req.query.tentb
+        //console.log(tentb)
+        if (req.isAuthenticated()) {
+            var data = await xulydb.tim_createthietbi(tentb)
+
+            //var _adata = JSON.stringify(data)
+            //console.log(_adata)
+            //console.log(data)
+            //console.log(newdata)
+            res.render("mainSbAdmin/createthietbi-sua", {
+                _username: req.user.username,
+                data: data,
+                activeuser: '',
+                activetb: '',
+                activetbdp2: 'active',
+
+            })
+
+        } else {
+            res.redirect("/signin")
+        }
+    })
+    .post('/suacreatethietbi', async (req, res) => {
+        if (req.isAuthenticated()) {
+            var nnhap = moment(req.body.ngaynhap)
+            var sothang = req.body.timehethan
+            const nhethan = nnhap.add(sothang, 'months')
+
+            var data = {
+                username: req.user.username,
+                tentb: req.body.tentb,
+                dvt: req.body.dvt,
+                soluong: req.body.soluong,
+                ngaynhap: req.body.ngaynhap,
+                timehethan: req.body.timehethan,
+                tenncc: req.body.tenncc,
+                sdtncc: req.body.sdtncc,
+                tinhtrang: req.body.tinhtrang,
+                ghichu: req.body.ghichu,
+                ngayhethan: nhethan.format('YYYY-MM-DD'),
+            }
+            try {
+                // console.log(data)
+                await xulydb.sua_createthietbi(data.tentb, data)
+                res.redirect('/viewcreatethietbi')
+            } catch {
+                e => {
+                    res.send(e)
+                }
+            }
+        } else {
+            res.redirect("/signin")
+        }
+    })
+
+//--------------------------------------------------
 
 router.post("/signin",
     passport.authenticate('local.signin', { successRedirect: '/vattutest',

@@ -32,6 +32,9 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
+app.use((req, res, next) => {
+  res.status(404).redirect("/signin");
+});
 
 // catch 404 and forward to error handler
 // app.use(function(req, res, next) {
